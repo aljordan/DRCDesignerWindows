@@ -1,0 +1,10 @@
+This is the Java source code for Digital Room Correction Designer for Windows.  DRCDesigner for Windows greatly eases the process of creating a digital room correction filters for audio systems.
+
+The functionality of the source code relies on the following opensource projects, as well as some other tools:
+DRC - http://drc-fir.sourceforge.net/
+SOX - http://sox.sourceforge.net/
+
+The application, packaged together with DRC, SOX, and all necessary scripts and tools can be found at:
+http://www.alanjordan.org/DRCDesigner/DRCDesigner.zip
+
+Please contact the author, Alan Jordan, at aljordan@gmail.com
