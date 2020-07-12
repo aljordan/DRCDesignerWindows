@@ -90,7 +90,7 @@ public class CustomFilterDrcProcessor extends Thread {
     
     private void runDrc() {
     	calculateCustomFileNumber();
-		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample";
+		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample";
 		String convolverDir = options.getRoomCorrectionRootPath() + "\\ConvolverFilters";
 		String micCompBehavior = "";
 		
@@ -104,7 +104,7 @@ public class CustomFilterDrcProcessor extends Thread {
 		try {
         	PrintWriter out = new PrintWriter(new FileWriter("drcWrapperRunDRCLeftcustom_" + samplingRate +  ".bat", false));
         	out.println("cd " + drcDir);
-        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\""+ options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=LeftSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=LeftSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm " + getCommandLineParameters() + " soft" + samplingRate + ".drc");
+        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\""+ options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=LeftSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=LeftSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm " + getCommandLineParameters() + " soft" + samplingRate + ".drc");
         	out.println("move /y LeftSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm \"" + convolverDir + "\"");
         	out.close();
         	
@@ -123,7 +123,7 @@ public class CustomFilterDrcProcessor extends Thread {
 
         	out = new PrintWriter(new FileWriter("drcWrapperRunDRCRightcustom_" + samplingRate +  ".bat", false));
         	out.println("cd " + drcDir);
-        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\""+ options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=RightSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=RightSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm --BCImpulseCenterMode=M --BCImpulseCenter=" + impulseCenter + " " + getCommandLineParameters() + " soft" + samplingRate + ".drc");
+        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\""+ options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=RightSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=RightSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm --BCImpulseCenterMode=M --BCImpulseCenter=" + impulseCenter + " " + getCommandLineParameters() + " soft" + samplingRate + ".drc");
         	out.println("move /y RightSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm \"" + convolverDir + "\"");
         	out.close();
         	resultsFileName = "drcOutputRight" + samplingRate + "custom.txt";
@@ -152,7 +152,7 @@ public class CustomFilterDrcProcessor extends Thread {
         try { sleep(1);} catch (InterruptedException ie) {}
 
         SoxProcessor sp = new SoxProcessor(options);
-        sp.createWavFromRawPcm(leftPcmFilePath, rightPcmFilePath, outputWavFilePath, samplingRate, true);
+        sp.createWavFromRawPcm(leftPcmFilePath, rightPcmFilePath, outputWavFilePath, samplingRate, !options.isSavePcmFiles());
     }
     
     private void generateConvolverConfigFile() {
