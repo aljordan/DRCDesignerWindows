@@ -70,7 +70,7 @@ public class DrcProcessor extends Thread {
 
 
     private void runDrc(FilterType fType) {
-		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample";
+		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample";
 		String convolverDir = options.getRoomCorrectionRootPath() + "\\ConvolverFilters";
 		String micCompBehavior = "";
 		
@@ -84,7 +84,7 @@ public class DrcProcessor extends Thread {
 		try {
         	PrintWriter out = new PrintWriter(new FileWriter("drcWrapperRunDRCLeft" + fType + "_" + samplingRate +  ".bat", false));
         	out.println("cd " + drcDir);
-        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\"" + options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=LeftSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=LeftSpeaker" + samplingRate + fType.toString().toUpperCase() + ".pcm " + fType.toString() + samplingRate + ".drc");
+        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\"" + options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=LeftSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=LeftSpeaker" + samplingRate + fType.toString().toUpperCase() + ".pcm " + fType.toString() + samplingRate + ".drc");
         	out.println("move /y LeftSpeaker" + samplingRate + fType.toString().toUpperCase() + ".pcm \"" + convolverDir + "\"");
         	out.close();
         	
@@ -108,7 +108,7 @@ public class DrcProcessor extends Thread {
 
         	out = new PrintWriter(new FileWriter("drcWrapperRunDRCRight" + fType + "_" + samplingRate +  ".bat", false));
         	out.println("cd " + drcDir);
-        	out.println("drc.exe "  + micCompBehavior + "--PSPointsFile=\"" + options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=RightSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=RightSpeaker" + samplingRate + fType.toString().toUpperCase() + ".pcm --BCImpulseCenterMode=M --BCImpulseCenter=" + impulseCenter + " " + fType.toString() + samplingRate + ".drc");
+        	out.println("drc.exe "  + micCompBehavior + "--PSPointsFile=\"" + options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=RightSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=RightSpeaker" + samplingRate + fType.toString().toUpperCase() + ".pcm --BCImpulseCenterMode=M --BCImpulseCenter=" + impulseCenter + " " + fType.toString() + samplingRate + ".drc");
         	out.println("move /y RightSpeaker" + samplingRate + fType.toString().toUpperCase() + ".pcm \"" + convolverDir + "\"");
         	out.close();
         	resultsFileName = "drcOutputRight" + samplingRate + fType.toString() + ".txt";
@@ -138,7 +138,7 @@ public class DrcProcessor extends Thread {
         try { sleep(1);} catch (InterruptedException ie) {}
 
         SoxProcessor sp = new SoxProcessor(options);
-        sp.createWavFromRawPcm(leftPcmFilePath, rightPcmFilePath, outputWavFilePath, samplingRate, true);
+        sp.createWavFromRawPcm(leftPcmFilePath, rightPcmFilePath, outputWavFilePath, samplingRate, !options.isSavePcmFiles());
     }
 
     
@@ -229,7 +229,7 @@ public class DrcProcessor extends Thread {
     
 	// Working version below for generating right channel DRC configuration file
 //  private void runDrc(FilterType fType) {
-//		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample";
+//		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample";
 //		String convolverDir = options.getRoomCorrectionRootPath() + "\\ConvolverFilters";
 //		
 //		parentWindow.setStatus("Generating left channel " + fType.toString() + " " + samplingRate + " filter");
