@@ -29,6 +29,7 @@ public class Options implements java.io.Serializable {
     private File micCompensationFile;
     private String micCompensationFilePath;
     private FrequencyAmplitudePoints points;
+    private boolean savePcmFiles;
     
     public void initOptions() {
         try {
@@ -39,7 +40,7 @@ public class Options implements java.io.Serializable {
             if (obj instanceof Options) {
                 Options tempOptions = (Options)obj;
 
-               
+
                 if (tempOptions.getRoomCorrectionRootPath() != null) {
                     this.roomCorrectionRoot = new File(tempOptions.getRoomCorrectionRootPath()); 
                     this.roomCorrectionRootPath = roomCorrectionRoot.getPath();
@@ -53,8 +54,8 @@ public class Options implements java.io.Serializable {
                 	this.setUseMicCompensationFile(true);
                 else
                 	this.setUseMicCompensationFile(false);
-                
-                if (tempOptions.getMicCompensationFilePath() != null) {
+
+               if (tempOptions.getMicCompensationFilePath() != null) {
                     this.micCompensationFile = new File(tempOptions.getMicCompensationFilePath()); 
                     this.micCompensationFilePath = micCompensationFile.getPath();
                 }
@@ -62,6 +63,11 @@ public class Options implements java.io.Serializable {
                     this.micCompensationFile = null;
                     this.micCompensationFilePath = null;
                 }
+
+                if (tempOptions.isSavePcmFiles())
+                    this.setSavePcmFiles(true);
+                else
+                    this.setSavePcmFiles(false);
 
                 if (tempOptions.getDriverType() != null) {
                 	this.driverType = tempOptions.getDriverType();
@@ -148,7 +154,12 @@ public class Options implements java.io.Serializable {
 	}
 
 
-	public boolean isUseMicCompensationFile() {
+    public void setSavePcmFiles(boolean savePcmFiles) {
+        this.savePcmFiles = savePcmFiles;
+    }
+
+
+    public boolean isUseMicCompensationFile() {
 		return useMicCompensationFile;
 	}
 
@@ -159,7 +170,13 @@ public class Options implements java.io.Serializable {
 	}
 
 
-	public File getMicCompensationFile() {
+    public boolean isSavePcmFiles() {
+        return savePcmFiles;
+    }
+
+
+
+    public File getMicCompensationFile() {
 		return micCompensationFile;
 	}
 

@@ -119,9 +119,9 @@ public class StandardFiltersPanel extends JPanel {
     }
 
 	private void enableDisableGenerateFiltersButton() {
-		File leftImpulseResponse = new File(options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\LeftSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm");
+		File leftImpulseResponse = new File(options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\LeftSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm");
 		boolean leftExists = leftImpulseResponse.exists(); 
-		File rightImpulseResponse = new File(options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\RightSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm");
+		File rightImpulseResponse = new File(options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\RightSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm");
 		boolean rightExists = rightImpulseResponse.exists();
 		
 		btnGenerateFilters.setEnabled(leftExists && rightExists);

@@ -22,6 +22,7 @@ import javax.swing.JFileChooser;
 import javax.swing.SwingUtilities;
 import javax.swing.JPanel;
 import javax.swing.JFrame;
+import javax.swing.JCheckBoxMenuItem;
 import java.awt.GridBagLayout;
 import java.awt.Dimension;
 import java.awt.Toolkit;
@@ -55,6 +56,8 @@ public class DRCDesigner extends JFrame {
 	private JMenuItem mnuItmDRCDesignerHelp = null;
 	private JMenuItem mnuItmAboutDRCDesigner = null;
 	private JFileChooser fcDrcDirectory;
+	private JCheckBoxMenuItem mnuChkSavePcmFiles;
+
 
 	private JTabbedPane getTabbedPaneMain() {
 		if (tabbedPaneMain == null) {
@@ -113,6 +116,9 @@ public class DRCDesigner extends JFrame {
 			rdoGrpInterfaceDriver.add(getMnuRdoDirectSound());
 			mnuOptions.add(getMnuRdoAsio());
 			mnuOptions.add(getMnuRdoDirectSound());
+
+			mnuOptions.add(getMnuChkSavePcmFiles());
+
 			mnuOptions.add(getMnuItmSetDrcDirectory());
 		}
 		return mnuOptions;
@@ -161,6 +167,24 @@ public class DRCDesigner extends JFrame {
 		}
 		return mnuRdoDirectSound;
 	}
+
+	/**
+	 * This method initializes mnuChkSavePcmFiles
+	 *
+	 * @return javax.swing.JRadioButtonMenuItem
+	 */
+	private JCheckBoxMenuItem getMnuChkSavePcmFiles() {
+		if (mnuChkSavePcmFiles == null) {
+			mnuChkSavePcmFiles = new JCheckBoxMenuItem("Save PCM Files");
+			mnuChkSavePcmFiles.addActionListener(new java.awt.event.ActionListener() {
+				public void actionPerformed(java.awt.event.ActionEvent e) {
+					options.setSavePcmFiles(mnuChkSavePcmFiles.getState());
+				}
+			});
+		}
+		return mnuChkSavePcmFiles;
+	}
+
 
 	/**
 	 * This method initializes mnuItmSetDrcDirectory	
@@ -257,6 +281,8 @@ public class DRCDesigner extends JFrame {
         		mnuRdoDirectSound.setSelected(true);
         	}
         }
+
+		mnuChkSavePcmFiles.setSelected(options.isSavePcmFiles());
 	}
 
 	private void initialize() {

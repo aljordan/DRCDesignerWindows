@@ -25,7 +25,7 @@ public class Targets {
 		ArrayList<FrequencyAmplitudePoint> faPoints = options.getPoints().getPoints();
 		int frequency = 0;
 		try {
-	    	PrintWriter out = new PrintWriter(new FileWriter(options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample\\DRCDesignerCustomizedPoints.txt", false));
+	    	PrintWriter out = new PrintWriter(new FileWriter(options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt", false));
 	    	for (int counter = 0; counter < faPoints.size(); counter++) {
 	    		if (counter == 0 )
 	    			frequency = 0;
