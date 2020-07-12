@@ -149,7 +149,7 @@ public class RecordSweepPanel extends JPanel {
 
 	private void launchRecordSweepScript() {
 		String recImpDir = options.getRoomCorrectionRootPath() + "\\Rec_imp.win32";
-		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.0\\sample";
+		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample";
 		String scriptName = "";
 		
 		lblLeftChannelPeak.setText("Left channel peak:");
