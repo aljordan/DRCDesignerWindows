@@ -28,7 +28,7 @@ import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.geom.Line2D;
 
-import javax.swing.JPanel;
+import javax.swing.*;
 
 public class TargetDesigner extends JPanel {
 
@@ -445,6 +445,8 @@ public class TargetDesigner extends JPanel {
 		this.setLayout(new GridBagLayout());
 		this.addMouseListener(new java.awt.event.MouseAdapter() {
 			public void mouseClicked(java.awt.event.MouseEvent e) {
+				JFrame topFrame = (JFrame)SwingUtilities.getAncestorOfClass(JFrame.class, TargetDesigner.this);
+                boolean cancelHighFrequencyPointCreation = false;
 				int x1 = e.getX();
 				int y1 = e.getY();
 				// check to see if click is within the drawable graph 
@@ -458,13 +460,25 @@ public class TargetDesigner extends JPanel {
 							fap.addFrequencyAmplitudePoint(new FrequencyAmplitudePoint(frequency,amplitude));
 							currentInstance.repaint();
 						}
-						else { // if there is a nearby point, delete it.
-							fap.removePoint(similarIndex);
-							currentInstance.repaint();
+						else { // if there is a nearby point, delete it or edit it off middle button.
+							if (SwingUtilities.isMiddleMouseButton(e) || SwingUtilities.isRightMouseButton(e)) {
+                                cancelHighFrequencyPointCreation = true;
+								// create dialog box to edit point
+								FrequencyAmplitudeDialog fad = new FrequencyAmplitudeDialog(topFrame, fap.getFrequencyAmplitudePoint(similarIndex + 1));
+								FrequencyAmplitudePoint point = fad.run();
+								if (point != null ) {
+									fap.editFrequencyAmplitudePoint(similarIndex, point.getFrequency(), point.getAmplitude());
+									currentInstance.repaint();
+								}
+							}
+							else {
+								fap.removePoint(similarIndex);
+								currentInstance.repaint();
+							}
 						}
 						// but if frequency is 21000 or 22050 draw if
 						// after deleting it because we only want one of each of those
-						if (frequency == 21000 || frequency == 22050) {
+						if (!cancelHighFrequencyPointCreation && (frequency == 21000 || frequency == 22050)) {
 							fap.addFrequencyAmplitudePoint(new FrequencyAmplitudePoint(frequency,amplitude));
 							currentInstance.repaint();							
 						}

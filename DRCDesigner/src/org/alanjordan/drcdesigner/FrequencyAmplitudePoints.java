@@ -100,6 +100,7 @@ public class FrequencyAmplitudePoints implements java.io.Serializable {
 		
 		public FrequencyAmplitudePoint getFrequencyAmplitudePoint(int index) {
 			return faPoints.get(index - 1);
+			//return faPoints.get(index);
 		}
 
 		
@@ -134,6 +135,11 @@ public class FrequencyAmplitudePoints implements java.io.Serializable {
 	    			this.highestAmplitude = point.getAmplitude();
 			}
 			this.sort();
+		}
+
+		public void editFrequencyAmplitudePoint(int index, double frequency, double amplitude) {
+			this.removePoint(index);
+			this.addFrequencyAmplitudePoint(new FrequencyAmplitudePoint(frequency,amplitude));
 		}
 		
 		public ArrayList<FrequencyAmplitudePoint> getPoints() {
