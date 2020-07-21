@@ -69,8 +69,12 @@ public class FrequencyAmplitudeDialog extends JDialog implements ActionListener 
     public void actionPerformed(ActionEvent ae) {
         Object source = ae.getSource();
         if (source == btnOk) {
-            editedPoint = new FrequencyAmplitudePoint(Double.parseDouble(frequencyField.getText()),
-                Double.parseDouble(amplitudeField.getText()));
+            try {
+                editedPoint = new FrequencyAmplitudePoint(Double.parseDouble(frequencyField.getText()),
+                        Double.parseDouble(amplitudeField.getText()));
+            } catch (NumberFormatException nfexc) {
+                editedPoint = null;
+            }
         }
         else {
             //editedPoint = new FrequencyAmplitudePoint(originalPoint.getFrequency(), originalPoint.getAmplitude());

@@ -457,10 +457,12 @@ public class TargetDesigner extends JPanel {
 						//check to see if there is already a nearby point - if not, draw the point
 						int similarIndex = fap.findSimilarPoint(frequency,amplitude);
 						if (similarIndex == -1) {
-							fap.addFrequencyAmplitudePoint(new FrequencyAmplitudePoint(frequency,amplitude));
-							currentInstance.repaint();
+							if (SwingUtilities.isLeftMouseButton(e)) {
+								fap.addFrequencyAmplitudePoint(new FrequencyAmplitudePoint(frequency, amplitude));
+								currentInstance.repaint();
+							}
 						}
-						else { // if there is a nearby point, delete it or edit it off middle button.
+						else { // if there is a nearby point, delete it or edit it edit it with right button press.
 							if (SwingUtilities.isMiddleMouseButton(e) || SwingUtilities.isRightMouseButton(e)) {
                                 cancelHighFrequencyPointCreation = true;
 								// create dialog box to edit point
@@ -471,7 +473,7 @@ public class TargetDesigner extends JPanel {
 									currentInstance.repaint();
 								}
 							}
-							else {
+							else if (SwingUtilities.isLeftMouseButton(e)) {
 								fap.removePoint(similarIndex);
 								currentInstance.repaint();
 							}
