@@ -63,7 +63,9 @@ public class TemplateLoader extends JPanel {
 		}
 	}
 	
-	public void enable(boolean enable) {
+	@Override
+	public void setEnabled(boolean enable) {
+		super.setEnabled(enable);
 		lblLoadTemplate.setEnabled(enable);
 		rdoMinimal.setEnabled(enable);
 		rdoSoft.setEnabled(enable);

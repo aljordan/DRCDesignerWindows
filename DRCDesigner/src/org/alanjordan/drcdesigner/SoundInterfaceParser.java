@@ -20,32 +20,36 @@ package org.alanjordan.drcdesigner;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.logging.Logger;
 
 public class SoundInterfaceParser {
+	private static final Logger LOGGER = AppLogger.getLogger();
 	private ArrayList<SoundInterface> allSoundcards = null;
 	private ArrayList<SoundInterface> playbackSoundcards = null;
 	private ArrayList<SoundInterface> recordingSoundcards = null;
+
+	private File getWorkFile(String fileName) {
+		return new File(Options.getAppDataDirectory(), fileName);
+	}
 
 	public SoundInterfaceParser(Options options) {
 		allSoundcards = new ArrayList<SoundInterface>();
 		recordingSoundcards = new ArrayList<SoundInterface>();
 		playbackSoundcards = new ArrayList<SoundInterface>();
 
-		//String command = "cmd.exe /c \"" + options.getRoomCorrectionRootPath() + "\\Rec_imp.win32\\rec_imp.exe -l 1>\\users\\c3axj\\recImpOutput.txt 2>&1\"";
-		//String command = "cmd.exe /c \"" + options.getRoomCorrectionRootPath() + "\\Rec_imp.win32\\rec_imp.exe -l\"";
-		String command;
+		String executable;
 		if (options.getDriverType() == Options.InterfaceDriverType.ASIO )
-			command = "cmd.exe /c \"\"" + options.getRoomCorrectionRootPath() + "\\Rec_imp.win32\\rec_impAsio.exe\" -l 1>recImpOutput.txt 2>&1\"";
-		else 
-			command = "cmd.exe /c \"\"" + options.getRoomCorrectionRootPath() + "\\Rec_imp.win32\\rec_impDS.exe\" -l 1>recImpOutput.txt 2>&1\"";
+			executable = options.getRoomCorrectionRootPath() + "\\Rec_imp.win32\\rec_impAsio.exe";
+		else
+			executable = options.getRoomCorrectionRootPath() + "\\Rec_imp.win32\\rec_impDS.exe";
 
 		try {
-			Runtime rt = Runtime.getRuntime();
-			Process p = rt.exec(command);
-			p.waitFor();
+			ProcessBuilder pb = new ProcessBuilder(executable, "-l");
+			ProcessExecutionUtil.runCommandAndCaptureOutput(pb, getWorkFile("recImpOutput.txt"), "Probe sound interfaces");
 			parseResultsFile();
 		}
 		catch(Exception exc){
+			LOGGER.warning("Sound interface probe failed: " + exc.getMessage());
 			exc.printStackTrace();
 		}
 		allSoundcards.trimToSize();
@@ -76,7 +80,7 @@ public class SoundInterfaceParser {
 	        Scanner scanner;
 	        String line;
 	        try {
-	            scanner = new Scanner(new File("recImpOutput.txt"));
+	            scanner = new Scanner(getWorkFile("recImpOutput.txt"));
 
 	            while (scanner.hasNextLine()) {
 	                line = scanner.nextLine();
@@ -112,6 +116,7 @@ public class SoundInterfaceParser {
 	            scanner.close();
 	        }
 	        catch (FileNotFoundException fnf) {
+	        	LOGGER.warning("recImpOutput.txt not found during parse.");
 	            System.out.println("Input file not found");
 	        }
 	}

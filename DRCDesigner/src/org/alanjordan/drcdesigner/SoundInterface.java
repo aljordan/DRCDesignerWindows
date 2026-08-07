@@ -79,7 +79,7 @@ public class SoundInterface {
 		if ((supportedSampleRates[0] != null && supportedSampleRates[0].equalsIgnoreCase("100"))
 				&& (supportedSampleRates[1] != null && supportedSampleRates[1].equalsIgnoreCase("200000")))
 			this.supportedSampleRates = new String[] {"44100","48000","88200","96000"};
-		else { //roundabout way of only ensuring sample rates between 44100 and 96000 get into the drop downs 
+		else { //roundabout way of only ensuring supported DRC rates get into the drop downs
 			boolean has44100 = false;
 			boolean has48000 = false;
 			boolean has88200 = false;

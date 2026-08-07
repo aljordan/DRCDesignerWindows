@@ -37,7 +37,7 @@ public class StandardFiltersPanel extends JPanel {
 	private static final long serialVersionUID = 1L;
 	private Options options = null;
 	private JLabel lblSamplingRate = null;
-	private JComboBox cboSamplingRate = null;
+	private JComboBox<String> cboSamplingRate = null;
 	private JButton btnGenerateFilters = null;
 	private JLabel lblStatus = null;
 	private JLabel lblFilterTypes = null;
@@ -49,6 +49,7 @@ public class StandardFiltersPanel extends JPanel {
 	private JLabel lblSpace0 = null;
 	private JCheckBox chkStrong = null;
 	private JCheckBox chkMicCompensation = null;
+	private JCheckBox chkUpsampleHighRate = null;
 	private JLabel lblMicCompensation = null;
 	private JFileChooser fcMicComp;
 	private JPanel runtimeInstance;
@@ -60,8 +61,10 @@ public class StandardFiltersPanel extends JPanel {
 		super();
 		initialize();
 		this.options = options;
+		getChkUpsampleHighRate().setSelected(this.options.isUpsampleStandardFilters());
 		initializeSamplingRates();
 		initializeMicCompensation();
+		updateUpsampleCheckboxAvailability();
 	}
 	
 	private void initializeMicCompensation() {
@@ -108,6 +111,10 @@ public class StandardFiltersPanel extends JPanel {
 		}
 		return result;
 	}
+
+	public boolean shouldUpsampleGeneratedFilters() {
+		return chkUpsampleHighRate.isSelected();
+	}
 	
 	
     public void setStatus(String status) {
@@ -129,12 +136,22 @@ public class StandardFiltersPanel extends JPanel {
 	}
 	
 	private void initializeSamplingRates() {
-		DefaultComboBoxModel rateModel = (DefaultComboBoxModel)cboSamplingRate.getModel();
+		DefaultComboBoxModel<String> rateModel = (DefaultComboBoxModel<String>)cboSamplingRate.getModel();
 		rateModel.removeAllElements();
 		rateModel.addElement("44100");
 		rateModel.addElement("48000");
 		rateModel.addElement("88200");
 		rateModel.addElement("96000");
+	}
+
+	private boolean supportsPostGenerationUpsample() {
+		String selectedRate = (String)cboSamplingRate.getSelectedItem();
+		return "88200".equals(selectedRate) || "96000".equals(selectedRate);
+	}
+
+	private void updateUpsampleCheckboxAvailability() {
+		boolean supported = supportsPostGenerationUpsample();
+		getChkUpsampleHighRate().setEnabled(supported);
 	}
 
 	/**
@@ -228,6 +245,12 @@ public class StandardFiltersPanel extends JPanel {
 		gridBagConstraints1.insets = new Insets(5, 5, 5, 5);
 		gridBagConstraints1.weighty = 0.0;
 		gridBagConstraints1.gridx = 0;
+		GridBagConstraints gridBagConstraintsUpsample = new GridBagConstraints();
+		gridBagConstraintsUpsample.gridx = 1;
+		gridBagConstraintsUpsample.gridy = 1;
+		gridBagConstraintsUpsample.anchor = GridBagConstraints.WEST;
+		gridBagConstraintsUpsample.insets = new Insets(5, 5, 5, 5);
+		gridBagConstraintsUpsample.weightx = 1.0;
 		GridBagConstraints gridBagConstraints = new GridBagConstraints();
 		gridBagConstraints.gridx = 0;
 		gridBagConstraints.insets = new Insets(5, 5, 5, 5);
@@ -242,6 +265,7 @@ public class StandardFiltersPanel extends JPanel {
 		this.setLayout(new GridBagLayout());
 		this.add(lblSamplingRate, gridBagConstraints);
 		this.add(getCboSamplingRate(), gridBagConstraints1);
+		this.add(getChkUpsampleHighRate(), gridBagConstraintsUpsample);
 		this.add(getBtnGenerateFilters(), gridBagConstraints2);
 		this.add(lblStatus, gridBagConstraints3);
 		this.add(lblFilterTypes, gridBagConstraints6);
@@ -263,16 +287,32 @@ public class StandardFiltersPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JComboBox	
 	 */
-	private JComboBox getCboSamplingRate() {
+	private JComboBox<String> getCboSamplingRate() {
 		if (cboSamplingRate == null) {
-			cboSamplingRate = new JComboBox();
+			cboSamplingRate = new JComboBox<String>();
 			cboSamplingRate.addItemListener(new java.awt.event.ItemListener() {
 				public void itemStateChanged(java.awt.event.ItemEvent e) {
 					enableDisableGenerateFiltersButton();
+					updateUpsampleCheckboxAvailability();
 				}
 			});
 		}
 		return cboSamplingRate;
+	}
+
+	private JCheckBox getChkUpsampleHighRate() {
+		if (chkUpsampleHighRate == null) {
+			chkUpsampleHighRate = new JCheckBox();
+			chkUpsampleHighRate.setText("Upsample to 176.4/192 kHz after generation");
+			chkUpsampleHighRate.setToolTipText("Uses SoX to create derived copies: 88.2 to 176.4 and 96 to 192.");
+			chkUpsampleHighRate.setSelected(options != null && options.isUpsampleStandardFilters());
+			chkUpsampleHighRate.addActionListener(new java.awt.event.ActionListener() {
+				public void actionPerformed(java.awt.event.ActionEvent e) {
+					options.setUpsampleStandardFilters(chkUpsampleHighRate.isSelected());
+				}
+			});
+		}
+		return chkUpsampleHighRate;
 	}
 
 	/**

@@ -46,6 +46,17 @@ public class TargetDesignerPanel extends JPanel {
 		FrequencyAmplitudePoints fap = t.getTarget(targetName);
 		targetDesigner.drawTarget(fap);
 	}
+
+	public void onResponseSmoothingChanged() {
+		ResponseCurveAnalysisUtil.analyzeAndStoreBestExistingResponseCurves(options);
+		if (targetDesigner != null) {
+			targetDesigner.repaint();
+		}
+	}
+
+	public Options getOptions() {
+		return options;
+	}
 	
 	
 	/**

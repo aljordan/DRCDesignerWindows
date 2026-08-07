@@ -31,16 +31,34 @@ public class SoxProcessor {
    
     public void createWavFromRawPcm(String leftPcmFilePath, String rightPcmFilePath, String outputWavFilePath, String samplingRate, boolean deletePcmFiles) {
         String soxExecutable = options.getRoomCorrectionRootPath() + "\\sox-14.3.2\\sox.exe";
-
-        String command = soxExecutable + " -M -t raw -b 32 -c 1 -f -r " + samplingRate + " \"" + leftPcmFilePath + "\" -t raw -b 32 -c 1 -f -r "  + samplingRate + " \"" + rightPcmFilePath + "\" -t wav -b 32 -f -r "  + samplingRate + " \"" + outputWavFilePath +"\"";
         
         try {
 //            PrintWriter out = new PrintWriter(new FileWriter("runSox.bat", false));
-//            out.println(command);
+    //            out.println(...);
 //            out.close();
 
-            Runtime rt = Runtime.getRuntime();
-            Process p = rt.exec(command);
+            ProcessBuilder pb = new ProcessBuilder(
+                soxExecutable,
+                "-M",
+                "-t", "raw",
+                "-b", "32",
+                "-c", "1",
+                "-f",
+                "-r", samplingRate,
+                leftPcmFilePath,
+                "-t", "raw",
+                "-b", "32",
+                "-c", "1",
+                "-f",
+                "-r", samplingRate,
+                rightPcmFilePath,
+                "-t", "wav",
+                "-b", "32",
+                "-f",
+                "-r", samplingRate,
+                outputWavFilePath);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             p.waitFor();
             
             if (deletePcmFiles) {
@@ -58,6 +76,29 @@ public class SoxProcessor {
         }       
 
 
+    }
+
+    public boolean resampleWavFile(String inputWavFilePath, String outputWavFilePath, String outputSamplingRate) {
+        String soxExecutable = options.getRoomCorrectionRootPath() + "\\sox-14.3.2\\sox.exe";
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                soxExecutable,
+                "-V1",
+                inputWavFilePath,
+                "-b", "32",
+                "-e", "floating-point",
+                outputWavFilePath,
+                "rate", "-v", "-L", outputSamplingRate);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            int exitCode = p.waitFor();
+            return exitCode == 0;
+        }
+        catch(Exception exc) {
+            exc.printStackTrace();
+            return false;
+        }
     }
 
 }

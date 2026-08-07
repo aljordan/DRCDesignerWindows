@@ -274,6 +274,39 @@
 	You can increase or decrease the amount of gain allowable with the Maximum Correction Boost slider.  Standard values are around 5 to 8 dB of gain.  
 	Over-doing with the maximum correction boost slider can make your amp and speakers work beyond their comfort zone.
 	<br><br> 
+	<hr>
+	<br>
+	<h2><a name="predictedResponseTab">Predicted Response Tab</a></h2>
+	The Predicted Response tab previews how the selected correction filter set affects measured left and right responses.
+	Use the <b>Filter set</b> selector to choose a generated filter label and use the <b>View</b> selector to switch graph modes.
+	The status line shows mode-specific metrics such as observed response context and DAC preattenuation guidance.
+	<br><br>
+	<h3><a name="predictedResponseView">Predicted Response View</a></h3>
+	This view overlays measured and predicted responses for left and right channels.
+	It is intended for relative comparison of tonal changes, not as an absolute calibrated SPL chart.
+	<br><br>
+	<h3><a name="impulseResponseView">Impulse Response (Time Domain) View</a></h3>
+	This view shows the measured impulse response before filtering and the predicted impulse response after filtering.
+	The horizontal axis is time in milliseconds and the vertical axis is normalized amplitude.
+	Use the <b>Impulse window</b> selector (for example 5 ms or 10 ms) for close inspection of arrival timing and driver alignment.
+	The displayed window is peak-centered around 0 ms with approximately 25% of the window before the peak and 75% after it, so before/after timing can be directly compared while keeping more post-peak detail visible.
+	Use the <b>B-L</b>, <b>B-R</b>, <b>A-L</b>, and <b>A-R</b> check boxes to show only the traces you want while inspecting alignment.
+	Use this graph to inspect time-domain behavior such as ringing duration and polarity changes introduced by correction.
+	<br><br>
+	<h3><a name="stepResponseView">Step Response (Time Domain) View</a></h3>
+	This view shows the step response derived from the same peak-centered impulse window, which is useful for assessing polarity behavior and settling trends.
+	The horizontal axis is time in milliseconds and the vertical axis is normalized step amplitude.
+	It uses the same <b>Impulse window</b> selector and <b>B-L</b>, <b>B-R</b>, <b>A-L</b>, and <b>A-R</b> visibility check boxes as the impulse view.
+	<br><br>
+	<h3><a name="dacClipRiskAbsoluteView">DAC Clip Risk (Absolute) View</a></h3>
+	This view shows absolute filter gain above 0 dBFS per channel, which is useful for estimating digital clipping risk before the DAC when no upstream attenuation is applied.
+	Use this graph as practical preattenuation guidance:
+	<ul>
+	<li><b>preatten&gt;=</b> is a conservative bound based on peak absolute filter gain.</li>
+	<li><b>rec</b> is a more practical recommendation for typical material (less conservative than the peak bound).</li>
+	</ul>
+	This is still an estimate because actual clipping incidence depends on source program peak levels and dynamic range.
+	<br><br>
 	<h2><a name="usingConvolverVST">Using and loading filters with Convolver VST</a></h2>
 	DRC Designer includes Convolver VST which is a plugin that can be loaded into J River Media Center,
 	Foobar 2000, CPlay, and possibly other media players to allow you to listen to music through your 

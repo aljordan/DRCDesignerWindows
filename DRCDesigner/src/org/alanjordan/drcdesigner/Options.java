@@ -18,8 +18,10 @@
 package org.alanjordan.drcdesigner;
 
 import java.io.*;
+import java.util.logging.Logger;
 
 public class Options implements java.io.Serializable {
+    private static final Logger LOGGER = AppLogger.getLogger();
 
     private File roomCorrectionRoot; //Root folder of RoomCorrectionCustomized folder
     private String roomCorrectionRootPath; //String representation of above variable because can't always serialize File object
@@ -29,67 +31,146 @@ public class Options implements java.io.Serializable {
     private File micCompensationFile;
     private String micCompensationFilePath;
     private FrequencyAmplitudePoints points;
+    private FrequencyAmplitudePoints leftChannelResponsePoints;
+    private FrequencyAmplitudePoints rightChannelResponsePoints;
+    private String responseSmoothingPreset;
     private boolean savePcmFiles;
+    private boolean upsampleStandardFilters;
+    private boolean upsampleCustomFilters;
+
+    private static final String APP_NAME = "DRCDesigner";
+
+    public static File getAppDataDirectory() {
+        String appData = System.getenv("APPDATA");
+        File optionsDir;
+
+        if (appData != null && appData.trim().length() > 0) {
+            optionsDir = new File(appData, APP_NAME);
+        }
+        else {
+            optionsDir = new File(System.getProperty("user.home"), ".drcdesigner");
+        }
+
+        if (!optionsDir.exists()) {
+            optionsDir.mkdirs();
+        }
+
+        return optionsDir;
+    }
+
+    private boolean hasExpectedToolLayout(File root) {
+        if (root == null || !root.exists() || !root.isDirectory()) {
+            return false;
+        }
+
+        return new File(root, "Rec_imp.win32").isDirectory()
+                && new File(root, "sox-14.3.2").isDirectory()
+                && new File(root, "drc-3.2.3").isDirectory();
+    }
+
+    private File normalizeRoomCorrectionRoot(File selectedRoot) {
+        if (selectedRoot == null) {
+            return null;
+        }
+
+        File cursor = selectedRoot;
+        while (cursor != null) {
+            if (hasExpectedToolLayout(cursor)) {
+                return cursor;
+            }
+
+            File appSubdir = new File(cursor, "app");
+            if (hasExpectedToolLayout(appSubdir)) {
+                return appSubdir;
+            }
+
+            cursor = cursor.getParentFile();
+        }
+
+        return selectedRoot;
+    }
+
+    private File getOptionsFile() {
+        return new File(getAppDataDirectory(), "DRCDesignerOptions.data");
+    }
     
     public void initOptions() {
         try {
-            FileInputStream f_in = new FileInputStream("DRCDesignerOptions.data");
-            ObjectInputStream obj_in = new ObjectInputStream (f_in);
-            Object obj = obj_in.readObject();
+            File optionsFile = getOptionsFile();
+            File legacyFile = new File("DRCDesignerOptions.data");
+            File loadFile = optionsFile.exists() ? optionsFile : legacyFile;
+            LOGGER.info("Loading options from: " + loadFile.getAbsolutePath());
 
-            if (obj instanceof Options) {
-                Options tempOptions = (Options)obj;
+            try (FileInputStream f_in = new FileInputStream(loadFile);
+                 ObjectInputStream obj_in = new ObjectInputStream(f_in)) {
+                Object obj = obj_in.readObject();
+
+                if (obj instanceof Options) {
+                    Options tempOptions = (Options)obj;
 
 
-                if (tempOptions.getRoomCorrectionRootPath() != null) {
-                    this.roomCorrectionRoot = new File(tempOptions.getRoomCorrectionRootPath()); 
-                    this.roomCorrectionRootPath = roomCorrectionRoot.getPath();
-                }
-                else {
-                    this.roomCorrectionRoot = null;
-                    this.roomCorrectionRootPath = null;
-                }
+                    if (tempOptions.getRoomCorrectionRootPath() != null) {
+                        this.setRoomCorrectionRoot(new File(tempOptions.getRoomCorrectionRootPath()));
+                    }
+                    else {
+                        this.roomCorrectionRoot = null;
+                        this.roomCorrectionRootPath = null;
+                    }
 
-                if (tempOptions.isUseMicCompensationFile())
-                	this.setUseMicCompensationFile(true);
-                else
-                	this.setUseMicCompensationFile(false);
+                    if (tempOptions.isUseMicCompensationFile())
+		        	    this.setUseMicCompensationFile(true);
+                    else
+		        	    this.setUseMicCompensationFile(false);
 
-               if (tempOptions.getMicCompensationFilePath() != null) {
-                    this.micCompensationFile = new File(tempOptions.getMicCompensationFilePath()); 
-                    this.micCompensationFilePath = micCompensationFile.getPath();
-                }
-                else {
-                    this.micCompensationFile = null;
-                    this.micCompensationFilePath = null;
-                }
+                    if (tempOptions.getMicCompensationFilePath() != null) {
+                        this.micCompensationFile = new File(tempOptions.getMicCompensationFilePath());
+                        this.micCompensationFilePath = micCompensationFile.getPath();
+                    }
+                    else {
+                        this.micCompensationFile = null;
+                        this.micCompensationFilePath = null;
+                    }
 
-                if (tempOptions.isSavePcmFiles())
-                    this.setSavePcmFiles(true);
-                else
-                    this.setSavePcmFiles(false);
+                    if (tempOptions.isSavePcmFiles())
+                        this.setSavePcmFiles(true);
+                    else
+                        this.setSavePcmFiles(false);
 
-                if (tempOptions.getDriverType() != null) {
-                	this.driverType = tempOptions.getDriverType();
-                }
-                else {
-                	this.driverType = null;
-                }
+                    this.setUpsampleStandardFilters(tempOptions.isUpsampleStandardFilters());
+                    this.setUpsampleCustomFilters(tempOptions.isUpsampleCustomFilters());
 
-                if (tempOptions.getPoints() != null) {
-                	this.points = tempOptions.getPoints();
-                }
-                else {
-                	this.points = null;
+                    if (tempOptions.getDriverType() != null) {
+		        	    this.driverType = tempOptions.getDriverType();
+                    }
+                    else {
+		        	    this.driverType = null;
+                    }
+
+                    if (tempOptions.getPoints() != null) {
+		        	    this.points = tempOptions.getPoints();
+                    }
+                    else {
+		        	    this.points = null;
+                    }
+
+                    if (tempOptions.getResponseSmoothingPreset() != null) {
+                        this.responseSmoothingPreset = tempOptions.getResponseSmoothingPreset();
+                    }
+                    else {
+                        this.responseSmoothingPreset = ResponseCurveAnalysisUtil.DisplaySmoothingPreset.OCTAVE_12.getId();
+                    }
                 }
             }
         }
         catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println(e.getStackTrace());
+            LOGGER.warning("Unable to load options: " + e.getMessage());
             roomCorrectionRoot = null;
             roomCorrectionRootPath = null;
         }
+
+		if (this.responseSmoothingPreset == null) {
+			this.responseSmoothingPreset = ResponseCurveAnalysisUtil.DisplaySmoothingPreset.OCTAVE_12.getId();
+		}
         
     }
 
@@ -99,29 +180,23 @@ public class Options implements java.io.Serializable {
         // can't be serialized and unserialized.
 
         // rely on string instead of File object
-        try {
+        if (roomCorrectionRoot != null) {
             roomCorrectionRootPath = roomCorrectionRoot.getPath();
-            roomCorrectionRoot = null;
-        }
-        catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println(e.getStackTrace());
-            roomCorrectionRootPath = null;
-            roomCorrectionRoot = null;
         }
         
         try {
-            FileOutputStream f_out = new FileOutputStream("DRCDesignerOptions.data");
-            ObjectOutputStream obj_out = new ObjectOutputStream (f_out);
-            obj_out.writeObject(this);
+            File optionsFile = getOptionsFile();
+            LOGGER.info("Saving options to: " + optionsFile.getAbsolutePath());
+            try (FileOutputStream f_out = new FileOutputStream(optionsFile);
+                 ObjectOutputStream obj_out = new ObjectOutputStream(f_out)) {
+                obj_out.writeObject(this);
+            }
         }
         catch (FileNotFoundException fe) {
-            System.out.println(fe.getMessage());
-            System.out.println(fe.getStackTrace());
+            LOGGER.warning("Options file path not found: " + fe.getMessage());
         }
         catch (IOException ioe) {
-            System.out.println(ioe.getMessage());
-            System.out.println(ioe.getStackTrace());
+            LOGGER.warning("Unable to save options: " + ioe.getMessage());
         }
     }
     
@@ -130,8 +205,9 @@ public class Options implements java.io.Serializable {
     }
 
     public void setRoomCorrectionRoot(File roomCorrectionRoot) {
-        this.roomCorrectionRoot = roomCorrectionRoot;
-        this.roomCorrectionRootPath = roomCorrectionRoot.getPath();
+        File normalized = normalizeRoomCorrectionRoot(roomCorrectionRoot);
+        this.roomCorrectionRoot = normalized;
+        this.roomCorrectionRootPath = normalized.getPath();
     }
     
     public File getRoomCorrectionRoot() {
@@ -174,6 +250,22 @@ public class Options implements java.io.Serializable {
         return savePcmFiles;
     }
 
+        public void setUpsampleStandardFilters(boolean upsampleStandardFilters) {
+		this.upsampleStandardFilters = upsampleStandardFilters;
+	}
+
+        public boolean isUpsampleStandardFilters() {
+		return upsampleStandardFilters;
+	}
+
+        public void setUpsampleCustomFilters(boolean upsampleCustomFilters) {
+		this.upsampleCustomFilters = upsampleCustomFilters;
+	}
+
+        public boolean isUpsampleCustomFilters() {
+		return upsampleCustomFilters;
+	}
+
 
 
     public File getMicCompensationFile() {
@@ -193,6 +285,33 @@ public class Options implements java.io.Serializable {
 	public FrequencyAmplitudePoints getPoints() {
 		return points;
 	}
+
+    public void setLeftChannelResponsePoints(FrequencyAmplitudePoints leftChannelResponsePoints) {
+        this.leftChannelResponsePoints = leftChannelResponsePoints;
+    }
+
+    public FrequencyAmplitudePoints getLeftChannelResponsePoints() {
+        return leftChannelResponsePoints;
+    }
+
+    public void setRightChannelResponsePoints(FrequencyAmplitudePoints rightChannelResponsePoints) {
+        this.rightChannelResponsePoints = rightChannelResponsePoints;
+    }
+
+    public FrequencyAmplitudePoints getRightChannelResponsePoints() {
+        return rightChannelResponsePoints;
+    }
+
+    public void setResponseSmoothingPreset(String responseSmoothingPreset) {
+        this.responseSmoothingPreset = responseSmoothingPreset;
+    }
+
+    public String getResponseSmoothingPreset() {
+        if (responseSmoothingPreset == null) {
+            responseSmoothingPreset = ResponseCurveAnalysisUtil.DisplaySmoothingPreset.OCTAVE_12.getId();
+        }
+        return responseSmoothingPreset;
+    }
 
 
 	/**

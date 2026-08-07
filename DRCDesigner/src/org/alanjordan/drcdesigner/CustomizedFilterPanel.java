@@ -32,6 +32,7 @@ import java.io.File;
 import javax.swing.JSlider;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JCheckBox;
 
 public class CustomizedFilterPanel extends JPanel {
 
@@ -58,7 +59,7 @@ public class CustomizedFilterPanel extends JPanel {
 	private JLabel lblLowFrequencyPreEchoValue = null;
 	private JLabel lblEpUpperWindow = null;
 	private ConfigurationEntries configEntries;
-	private JComboBox cboSamplingRate = null;
+	private JComboBox<String> cboSamplingRate = null;
 	private JLabel lblSamplingRate = null;
 	private TemplateLoader templateLoader = null;
 	private JLabel lblMidFrequencyPreEchoControl = null;
@@ -69,6 +70,7 @@ public class CustomizedFilterPanel extends JPanel {
 	private JLabel lblMaxCorrectionBoostValue = null;
 	private JLabel lblPeakLimitingMaxGain = null;
 	private JLabel lblStatus = null;
+	private JCheckBox chkUpsampleHighRate = null;
 	
 	/**
 	 * This is the default constructor
@@ -78,6 +80,7 @@ public class CustomizedFilterPanel extends JPanel {
 		initialize();
 		configEntries = new ConfigurationEntries();
 		this.options = options;
+		getChkUpsampleHighRate().setSelected(this.options.isUpsampleCustomFilters());
 		initializeSamplingRates();
 		sldLowFrequencyStrength.setValue(0);
 		sldMidFrequencyStrength.setValue(0);
@@ -86,6 +89,7 @@ public class CustomizedFilterPanel extends JPanel {
 		//Todo: crappy trick to get screen painted correctly below.   Fix it.
 		cboSamplingRate.setSelectedIndex(1);
 		cboSamplingRate.setSelectedIndex(0);
+		updateUpsampleCheckboxAvailability();
 		//cboSamplingRate.setSelectedItem(cboSamplingRate.getItemAt(0));
 	}
 
@@ -138,6 +142,10 @@ public class CustomizedFilterPanel extends JPanel {
 		else
 			return null;
 	}
+
+	public boolean shouldUpsampleGeneratedFilters() {
+		return chkUpsampleHighRate.isSelected();
+	}
 	
 	private int calculateMpUpperWindow(int sliderPercentage) {
 		float lowerBound = 22.0F;
@@ -150,17 +158,27 @@ public class CustomizedFilterPanel extends JPanel {
 		boolean leftExists = leftImpulseResponse.exists(); 
 		File rightImpulseResponse = new File(options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\RightSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm");
 		boolean rightExists = rightImpulseResponse.exists();		
-		this.enable((leftExists && rightExists));
-		templateLoader.enable((leftExists && rightExists));
+		this.setEnabled((leftExists && rightExists));
+		templateLoader.setEnabled((leftExists && rightExists));
 	}
 
 	private void initializeSamplingRates() {
-		DefaultComboBoxModel rateModel = (DefaultComboBoxModel)cboSamplingRate.getModel();
+		DefaultComboBoxModel<String> rateModel = (DefaultComboBoxModel<String>)cboSamplingRate.getModel();
 		rateModel.removeAllElements();
 		rateModel.addElement("44100");
 		rateModel.addElement("48000");
 		rateModel.addElement("88200");
 		rateModel.addElement("96000");
+	}
+
+	private boolean supportsPostGenerationUpsample() {
+		String selectedRate = (String)cboSamplingRate.getSelectedItem();
+		return "88200".equals(selectedRate) || "96000".equals(selectedRate);
+	}
+
+	private void updateUpsampleCheckboxAvailability() {
+		boolean supported = supportsPostGenerationUpsample();
+		getChkUpsampleHighRate().setEnabled(supported && this.isEnabled());
 	}
 
 	private float calculateMaxCorrectionGain(double plMaxGain) {
@@ -233,7 +251,9 @@ public class CustomizedFilterPanel extends JPanel {
         return 100 - (Math.round((rangedValue / range) * 100));
 	}
 	
-	public void enable(boolean enable) {
+	@Override
+	public void setEnabled(boolean enable) {
+		super.setEnabled(enable);
 		lblLowFrequencyStrength.setEnabled(enable);
 		lblMidFrequencyStrength.setEnabled(enable);
 		lblHighFrequencyStrength.setEnabled(enable);
@@ -261,6 +281,9 @@ public class CustomizedFilterPanel extends JPanel {
 		lblMaxCorrectionBoostValue.setEnabled(enable);
 		sldMaxCorrectionBoost.setEnabled(enable);
 		btnGenerateCustomFilter.setEnabled(enable);
+		if (chkUpsampleHighRate != null) {
+			chkUpsampleHighRate.setEnabled(enable && supportsPostGenerationUpsample());
+		}
 	}
 	
 	/**
@@ -337,6 +360,13 @@ public class CustomizedFilterPanel extends JPanel {
 		gridBagConstraints17.weightx = 1.0;
 		gridBagConstraints17.anchor = GridBagConstraints.WEST;
 		gridBagConstraints17.gridx = 0;
+
+		GridBagConstraints gridBagConstraintsUpsample = new GridBagConstraints();
+		gridBagConstraintsUpsample.gridx = 1;
+		gridBagConstraintsUpsample.gridy = 1;
+		gridBagConstraintsUpsample.gridwidth = 2;
+		gridBagConstraintsUpsample.anchor = GridBagConstraints.WEST;
+		gridBagConstraintsUpsample.insets = new Insets(5, 5, 5, 5);
 		this.setSize(800, 600);
 		this.setLayout(new GridBagLayout());
 
@@ -523,6 +553,7 @@ public class CustomizedFilterPanel extends JPanel {
 		this.add(lblLowFrequencyPreEchoValue, gridBagConstraints15);
 		this.add(lblEpUpperWindow, gridBagConstraints16);
 		this.add(getCboSamplingRate(), gridBagConstraints17);
+		this.add(getChkUpsampleHighRate(), gridBagConstraintsUpsample);
 		this.add(lblSamplingRate, gridBagConstraints25);
 		this.add(getTemplateLoader(), gridBagConstraints18);
 		this.add(lblMidFrequencyPreEchoControl, gridBagConstraints26);
@@ -664,17 +695,33 @@ public class CustomizedFilterPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JComboBox	
 	 */
-	private JComboBox getCboSamplingRate() {
+	private JComboBox<String> getCboSamplingRate() {
 		if (cboSamplingRate == null) {
-			cboSamplingRate = new JComboBox();
+			cboSamplingRate = new JComboBox<String>();
 			cboSamplingRate.addItemListener(new java.awt.event.ItemListener() {
 				public void itemStateChanged(java.awt.event.ItemEvent e) {
 					templateLoader.setSelectedFilterTemplate(DrcProcessor.FilterType.soft);
 					enableDisablePanel();
+					updateUpsampleCheckboxAvailability();
 				}
 			});
 		}
 		return cboSamplingRate;
+	}
+
+	private JCheckBox getChkUpsampleHighRate() {
+		if (chkUpsampleHighRate == null) {
+			chkUpsampleHighRate = new JCheckBox();
+			chkUpsampleHighRate.setText("Upsample to 176.4/192 kHz after generation");
+			chkUpsampleHighRate.setToolTipText("Uses SoX to create derived copies: 88.2 to 176.4 and 96 to 192.");
+			chkUpsampleHighRate.setSelected(options != null && options.isUpsampleCustomFilters());
+			chkUpsampleHighRate.addActionListener(new java.awt.event.ActionListener() {
+				public void actionPerformed(java.awt.event.ActionEvent e) {
+					options.setUpsampleCustomFilters(chkUpsampleHighRate.isSelected());
+				}
+			});
+		}
+		return chkUpsampleHighRate;
 	}
 
 	/**

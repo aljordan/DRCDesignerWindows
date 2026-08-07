@@ -20,9 +20,11 @@ package org.alanjordan.drcdesigner;
 import java.awt.GridBagLayout;
 
 import javax.swing.ButtonGroup;
+import javax.swing.JComboBox;
 import javax.swing.JPanel;
 import javax.swing.JLabel;
 import java.awt.GridBagConstraints;
+import java.awt.Insets;
 import javax.swing.JRadioButton;
 
 public class TargetLoader extends JPanel {
@@ -36,6 +38,8 @@ public class TargetLoader extends JPanel {
 	private JRadioButton rdoBK3 = null;
 	private JRadioButton rdoDeepTilt = null;
 	private JRadioButton rdoDeepTilt2 = null;
+	private JLabel lblResponseSmoothing = null;
+	private JComboBox<String> cboResponseSmoothing = null;
 	private TargetDesignerPanel parent;
 
 	/**
@@ -43,8 +47,8 @@ public class TargetLoader extends JPanel {
 	 */
 	public TargetLoader(TargetDesignerPanel parent) {
 		super();
-		initialize();
 		this.parent = parent;
+		initialize();
 	}
 	
 	public void setSelectedTarget(Targets.TargetNames targetName) {
@@ -79,6 +83,18 @@ public class TargetLoader extends JPanel {
 	private void initialize() {
 		btnGrpTarget = getBtnGrpTarget();
 
+		GridBagConstraints gridBagConstraintsSmoothingControl = new GridBagConstraints();
+		gridBagConstraintsSmoothingControl.gridx = 8;
+		gridBagConstraintsSmoothingControl.gridy = 0;
+		gridBagConstraintsSmoothingControl.insets = new Insets(0, 6, 0, 0);
+		gridBagConstraintsSmoothingControl.anchor = GridBagConstraints.WEST;
+
+		GridBagConstraints gridBagConstraintsSmoothingLabel = new GridBagConstraints();
+		gridBagConstraintsSmoothingLabel.gridx = 7;
+		gridBagConstraintsSmoothingLabel.gridy = 0;
+		gridBagConstraintsSmoothingLabel.insets = new Insets(0, 14, 0, 0);
+		gridBagConstraintsSmoothingLabel.anchor = GridBagConstraints.WEST;
+
 		GridBagConstraints gridBagConstraints11 = new GridBagConstraints();
 		gridBagConstraints11.gridx = 6;
 		gridBagConstraints11.gridy = 0;
@@ -111,12 +127,17 @@ public class TargetLoader extends JPanel {
 		this.add(getRdoBK3(), gridBagConstraints4);
 		this.add(getRdoDeepTilt(), gridBagConstraints21);
 		this.add(getRdoDeepTilt2(), gridBagConstraints11);
+		this.add(getLblResponseSmoothing(), gridBagConstraintsSmoothingLabel);
+		this.add(getCboResponseSmoothing(), gridBagConstraintsSmoothingControl);
 		btnGrpTarget.add(rdoFlat);
 		btnGrpTarget.add(rdoBK);
 		btnGrpTarget.add(rdoBK2);
 		btnGrpTarget.add(rdoBK3);
 		btnGrpTarget.add(rdoDeepTilt);
 		btnGrpTarget.add(rdoDeepTilt2);
+
+		String selectedLabel = ResponseCurveAnalysisUtil.getDisplayLabelForPresetId(parent.getOptions().getResponseSmoothingPreset());
+		cboResponseSmoothing.setSelectedItem(selectedLabel);
 	}
 
 	/**
@@ -232,6 +253,34 @@ public class TargetLoader extends JPanel {
 			});
 		}
 		return rdoDeepTilt;
+	}
+
+	private JLabel getLblResponseSmoothing() {
+		if (lblResponseSmoothing == null) {
+			lblResponseSmoothing = new JLabel();
+			lblResponseSmoothing.setText("Response smoothing:");
+		}
+		return lblResponseSmoothing;
+	}
+
+	private JComboBox<String> getCboResponseSmoothing() {
+		if (cboResponseSmoothing == null) {
+			cboResponseSmoothing = new JComboBox<String>(ResponseCurveAnalysisUtil.getDisplaySmoothingLabels());
+			cboResponseSmoothing.addActionListener(new java.awt.event.ActionListener() {
+				public void actionPerformed(java.awt.event.ActionEvent e) {
+					Object selectedItem = cboResponseSmoothing.getSelectedItem();
+					if (selectedItem == null) {
+						return;
+					}
+
+					String selectedLabel = selectedItem.toString();
+					String selectedPresetId = ResponseCurveAnalysisUtil.getPresetIdForDisplayLabel(selectedLabel);
+					parent.getOptions().setResponseSmoothingPreset(selectedPresetId);
+					parent.onResponseSmoothingChanged();
+				}
+			});
+		}
+		return cboResponseSmoothing;
 	}
 
 

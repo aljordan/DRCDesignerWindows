@@ -20,11 +20,19 @@ package org.alanjordan.drcdesigner;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
+import java.util.logging.Logger;
 
 
 public class CustomFilterDrcProcessor extends Thread {
+	private static final Logger LOGGER = AppLogger.getLogger();
 
 	private Options options;
 	private CustomizedFilterPanel parentWindow;
@@ -32,6 +40,10 @@ public class CustomFilterDrcProcessor extends Thread {
 	private String impulseCenter;
 	private ConfigurationEntries configEntries;
 	private int customFileNumber;
+
+	private File getWorkFile(String fileName) {
+		return new File(Options.getAppDataDirectory(), fileName);
+	}
 
 	
     public CustomFilterDrcProcessor(Options options, CustomizedFilterPanel parentWindow, String samplingRate, ConfigurationEntries configEntries) {
@@ -47,12 +59,29 @@ public class CustomFilterDrcProcessor extends Thread {
 		parentWindow.enableDisableGenerateFiltersButton(false);
         try { sleep(1);} catch (InterruptedException ie) {}
 
+        boolean generationSucceeded;
+        boolean upsampleAttempted = false;
+        boolean upsampleSucceeded = true;
+
         Targets t = new Targets(options);
         t.writeTargetPointsFile(Integer.parseInt(samplingRate));
 
-        runDrc();
+        generationSucceeded = runDrc();
+
+		if (generationSucceeded && parentWindow.shouldUpsampleGeneratedFilters() && supportsPostGenerationUpsample()) {
+			upsampleAttempted = true;
+			upsampleSucceeded = upsampleCustomWav();
+		}
         
-    	parentWindow.setStatus("Finished generating filters");
+		if (!generationSucceeded) {
+			parentWindow.setStatus("Finished generating filters with errors");
+		}
+		else if (upsampleAttempted && !upsampleSucceeded) {
+			parentWindow.setStatus("Finished generating filters; high-rate upsample had errors");
+		}
+		else {
+	    		parentWindow.setStatus("Finished generating filters");
+		}
         try { sleep(1);} catch (InterruptedException ie) {}
         
 		parentWindow.enableDisableGenerateFiltersButton(true);
@@ -88,59 +117,127 @@ public class CustomFilterDrcProcessor extends Thread {
 		}
     }
     
-    private void runDrc() {
+    private boolean runDrc() {
     	calculateCustomFileNumber();
 		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample";
 		String convolverDir = options.getRoomCorrectionRootPath() + "\\ConvolverFilters";
-		String micCompBehavior = "";
-		
-		if (options.isUseMicCompensationFile() && options.getMicCompensationFile() != null) {
-			micCompBehavior = "--MCFilterType=M --MCPointsFile=\"" + options.getMicCompensationFilePath() + "\" ";
-		}
 		
 		parentWindow.setStatus("Generating left channel custom " + samplingRate + " filter");
         try { sleep(1);} catch (InterruptedException ie) {}
 
 		try {
-        	PrintWriter out = new PrintWriter(new FileWriter("drcWrapperRunDRCLeftcustom_" + samplingRate +  ".bat", false));
-        	out.println("cd " + drcDir);
-        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\""+ options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=LeftSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=LeftSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm " + getCommandLineParameters() + " soft" + samplingRate + ".drc");
-        	out.println("move /y LeftSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm \"" + convolverDir + "\"");
-        	out.close();
-        	
-        	String resultsFileName = "drcOutputLeft" + samplingRate + "custom.txt";
-    		String command = "cmd.exe /c \"drcWrapperRunDRCLeft" + "custom_" + samplingRate + ".bat 1>" + resultsFileName + " 2>&1\"";
-    		Runtime rt = Runtime.getRuntime();
-    		Process p = rt.exec(command);
-    		p.waitFor();
+	        String leftOutputPcmName = "LeftSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm";
+	        List<String> leftCommand = createDrcCommand(
+	        		"LeftSpeakerImpulseResponse" + samplingRate + ".pcm",
+	        		leftOutputPcmName,
+	        		impulseCenter,
+	        		false);
+	        File resultsFile = getWorkFile("drcOutputLeft" + samplingRate + "custom.txt");
+	    		runDrcCommand(leftCommand, new File(drcDir), resultsFile, "DRC custom left " + samplingRate);
+	    		moveOutputFile(drcDir, leftOutputPcmName, convolverDir);
 
     		parentWindow.setStatus("Parsing results to find center");
             try { sleep(1);} catch (InterruptedException ie) {}
-            impulseCenter = parseResultsFileForImpulseCenter(resultsFileName);
+	        impulseCenter = parseResultsFileForImpulseCenter(resultsFile.getAbsolutePath());
             
     		parentWindow.setStatus("Generating right channel custom " + samplingRate + " filter");
             try { sleep(1);} catch (InterruptedException ie) {}
 
-        	out = new PrintWriter(new FileWriter("drcWrapperRunDRCRightcustom_" + samplingRate +  ".bat", false));
-        	out.println("cd " + drcDir);
-        	out.println("drc.exe " + micCompBehavior + "--PSPointsFile=\""+ options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt\" " + "--BCInFile=RightSpeakerImpulseResponse" + samplingRate + ".pcm --PSOutFile=RightSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm --BCImpulseCenterMode=M --BCImpulseCenter=" + impulseCenter + " " + getCommandLineParameters() + " soft" + samplingRate + ".drc");
-        	out.println("move /y RightSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm \"" + convolverDir + "\"");
-        	out.close();
-        	resultsFileName = "drcOutputRight" + samplingRate + "custom.txt";
-    		command = "cmd.exe /c \"drcWrapperRunDRCRight" + "custom_" + samplingRate + ".bat 1>" + resultsFileName + " 2>&1\"";
-    		rt = Runtime.getRuntime();
-    		p = rt.exec(command);
-    		p.waitFor();
+	        String rightOutputPcmName = "RightSpeaker" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".pcm";
+	        List<String> rightCommand = createDrcCommand(
+	        		"RightSpeakerImpulseResponse" + samplingRate + ".pcm",
+	        		rightOutputPcmName,
+	        		impulseCenter,
+	        		true);
+	        resultsFile = getWorkFile("drcOutputRight" + samplingRate + "custom.txt");
+	    		runDrcCommand(rightCommand, new File(drcDir), resultsFile, "DRC custom right " + samplingRate);
+	    		moveOutputFile(drcDir, rightOutputPcmName, convolverDir);
     		
 //    		generateConvolverConfigFile();
     		
     		generateWavFile(samplingRate);
 		}
     	catch(Exception exc){
+			LOGGER.warning("Failed running custom DRC " + samplingRate + ": " + exc.getMessage());
     		exc.printStackTrace();
+	    		return false;
     	}		
-    	
+	    
+		return true;
     }
+
+	private boolean supportsPostGenerationUpsample() {
+		return "88200".equals(samplingRate) || "96000".equals(samplingRate);
+	}
+
+	private boolean upsampleCustomWav() {
+		String destinationRate = "88200".equals(samplingRate) ? "176400" : "192000";
+		String convolverDir = options.getRoomCorrectionRootPath() + "\\ConvolverFilters\\";
+		String inputPath = convolverDir + "Stereo" + samplingRate + "CUSTOM" + "_" + customFileNumber + ".wav";
+		String outputPath = convolverDir + "Stereo" + destinationRate + "CUSTOM" + "_" + customFileNumber + ".wav";
+
+		parentWindow.setStatus("Upsampling custom filter to " + destinationRate);
+		try { sleep(1);} catch (InterruptedException ie) {}
+
+		SoxProcessor sp = new SoxProcessor(options);
+		boolean success = sp.resampleWavFile(inputPath, outputPath, destinationRate);
+		if (!success) {
+			LOGGER.warning("Failed upsampling custom filter from " + samplingRate + " to " + destinationRate + " for index " + customFileNumber);
+		}
+		return success;
+	}
+
+	private List<String> createDrcCommand(String inputPcmName, String outputPcmName, String impulseCenterValue, boolean includeImpulseCenter) {
+		List<String> command = new ArrayList<String>();
+		String drcExecutablePath = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\drc.exe";
+		command.add(drcExecutablePath);
+		if (options.isUseMicCompensationFile() && options.getMicCompensationFile() != null) {
+			command.add("--MCFilterType=M");
+			command.add("--MCPointsFile=" + options.getMicCompensationFilePath());
+		}
+		command.add("--PSPointsFile=" + options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\DRCDesignerCustomizedPoints.txt");
+		command.add("--BCInFile=" + inputPcmName);
+		command.add("--PSOutFile=" + outputPcmName);
+		if (includeImpulseCenter) {
+			command.add("--BCImpulseCenterMode=M");
+			command.add("--BCImpulseCenter=" + impulseCenterValue);
+		}
+		for (String parameter : getCommandLineParameters().split(" ")) {
+			if (parameter.length() > 0) {
+				command.add(parameter);
+			}
+		}
+		command.add("soft" + samplingRate + ".drc");
+		return command;
+	}
+
+	private void runDrcCommand(List<String> command, File workingDirectory, File outputFile, String operationName) throws IOException, InterruptedException {
+		String psPointsFile = getCommandArgumentValue(command, "--PSPointsFile=");
+		String templateFile = command.get(command.size() - 1);
+		LOGGER.info(operationName + " inputs: PSPointsFile=" + psPointsFile + ", Template=" + templateFile);
+
+		ProcessBuilder pb = new ProcessBuilder(command);
+		pb.directory(workingDirectory);
+		int exitCode = ProcessExecutionUtil.runCommandAndCaptureOutput(pb, outputFile, operationName);
+		if (exitCode != 0) {
+			throw new IOException(operationName + " failed with exit code " + exitCode);
+		}
+	}
+
+	private String getCommandArgumentValue(List<String> command, String prefix) {
+		for (String argument : command) {
+			if (argument.startsWith(prefix)) {
+				return argument.substring(prefix.length());
+			}
+		}
+		return "";
+	}
+
+	private void moveOutputFile(String sourceDirectory, String fileName, String destinationDirectory) throws IOException {
+		Path source = new File(sourceDirectory, fileName).toPath();
+		Path destination = new File(destinationDirectory, fileName).toPath();
+		Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
+	}
     
     private void generateWavFile(String samplingRate) {
         String convolverDir = options.getRoomCorrectionRootPath() + "\\ConvolverFilters\\";
@@ -176,6 +273,7 @@ public class CustomFilterDrcProcessor extends Thread {
 		      out.close();
 		}
     	catch(Exception exc){
+			LOGGER.warning("Failed running custom DRC " + samplingRate + ": " + exc.getMessage());
     		exc.printStackTrace();
     	}		   	
     }

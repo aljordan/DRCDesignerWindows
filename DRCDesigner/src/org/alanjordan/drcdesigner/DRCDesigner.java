@@ -31,20 +31,29 @@ import javax.swing.JTabbedPane;
 
 import java.awt.GridBagConstraints;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.logging.Logger;
 import javax.swing.JMenuBar;
 import javax.swing.JMenu;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JMenuItem;
 
 public class DRCDesigner extends JFrame {
+	private static final Logger LOGGER = AppLogger.getLogger();
 
 	private static final long serialVersionUID = 1L;
+	private static final int DEFAULT_WINDOW_WIDTH = 1000;
+	private static final int DEFAULT_WINDOW_HEIGHT = 600;
 	private JPanel jContentPane = null;
 	private JTabbedPane tabbedPaneMain = null;
 	private RecordSweepPanel rsp = null;
 	private StandardFiltersPanel sfp = null;
 	private CustomizedFilterPanel cfp = null;
 	private TargetDesignerPanel tdp = null;
+	private PredictedResponsePanel prp = null;
 	private Options options = null;
 	private JMenuBar mnuDrcWrapper = null;
 	private JMenu mnuOptions = null;
@@ -63,7 +72,7 @@ public class DRCDesigner extends JFrame {
 		if (tabbedPaneMain == null) {
 			tabbedPaneMain = new JTabbedPane();
 		}
-		tabbedPaneMain.setPreferredSize(new Dimension(800, 600));
+		tabbedPaneMain.setPreferredSize(new Dimension(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT));
 		if (rsp == null) {
 			rsp = new RecordSweepPanel(options);
 		}		
@@ -74,6 +83,10 @@ public class DRCDesigner extends JFrame {
 		}
 		tabbedPaneMain.addTab("Target Designer", tdp);
 
+		if (prp == null) {
+			prp = new PredictedResponsePanel(options);
+		}
+
 		if (sfp == null) {
 			sfp = new StandardFiltersPanel(options);
 		}			
@@ -83,6 +96,7 @@ public class DRCDesigner extends JFrame {
 			cfp = new CustomizedFilterPanel(options);
 		}
 		tabbedPaneMain.addTab("Generate Custom Filters", cfp);
+		tabbedPaneMain.addTab("Predicted Response", prp);
 
 		return tabbedPaneMain;
 	}
@@ -201,7 +215,8 @@ public class DRCDesigner extends JFrame {
 
 		            int retval = fcDrcDirectory.showOpenDialog(jContentPane);
 		            if (retval == JFileChooser.APPROVE_OPTION) {
-		            	options.setRoomCorrectionRoot(fcDrcDirectory.getSelectedFile());
+		            	options.setRoomCorrectionRoot(resolveSelectedRoot(fcDrcDirectory.getSelectedFile()));
+		            	loadExistingResponseCurves();
 		            }
 				}
 			});
@@ -260,18 +275,51 @@ public class DRCDesigner extends JFrame {
 	public DRCDesigner() {
 		super();
         setIconImage(Toolkit.getDefaultToolkit().getImage(DRCDesigner.class.getResource("music_green.png")));
+		LOGGER.info("Starting DRCDesigner");
         options = new Options();
         options.initOptions();
 		initialize();
         initializeOptions();
+		loadExistingResponseCurves();
+	}
+
+	private void loadExistingResponseCurves() {
+		String sampleRate = ResponseCurveAnalysisUtil.findBestExistingResponseSampleRate(options);
+		if (sampleRate == null) {
+			options.setLeftChannelResponsePoints(null);
+			options.setRightChannelResponsePoints(null);
+			return;
+		}
+
+		ResponseCurveAnalysisUtil.analyzeAndStoreResponseCurves(options, sampleRate);
+		if (tdp != null) {
+			tdp.repaint();
+		}
 	}
 
 	private void initializeOptions() {
-		//TODO: change this to allow user to set room correction folder
+		File bundledRoot = detectBundledRoot();
+		LOGGER.info("Bundled root: " + (bundledRoot != null ? bundledRoot.getAbsolutePath() : "not detected"));
+		File writableRoot = null;
+		if (bundledRoot != null) {
+			writableRoot = new File(Options.getAppDataDirectory(), "RoomCorrectionRoot");
+			ensureWritableRootInitialized(bundledRoot, writableRoot);
+			LOGGER.info("Writable root initialized at: " + writableRoot.getAbsolutePath());
+		}
+
+		if (writableRoot != null && options.getRoomCorrectionRoot() != null) {
+			File currentRoot = options.getRoomCorrectionRoot();
+			File installRoot = bundledRoot.getParentFile();
+			if (isSameOrDescendant(currentRoot, bundledRoot)
+					|| (installRoot != null && isSameOrDescendant(currentRoot, installRoot))) {
+				options.setRoomCorrectionRoot(writableRoot);
+			}
+		}
+
         if (options.getRoomCorrectionRoot() == null) {
-            //options.setRoomCorrectionRoot(new File("/DRCDesigner"));
-        	options.setRoomCorrectionRoot(new File(System.getProperty("user.dir")));
+			options.setRoomCorrectionRoot(determineDefaultRoomCorrectionRoot());
         }
+		LOGGER.info("Active room-correction root: " + options.getRoomCorrectionRootPath());
 		//TODO: change this to allow user to set sound driver type in options menu
         if (options.getDriverType() != null) {
         	if (options.getDriverType() == Options.InterfaceDriverType.ASIO) {
@@ -285,8 +333,161 @@ public class DRCDesigner extends JFrame {
 		mnuChkSavePcmFiles.setSelected(options.isSavePcmFiles());
 	}
 
+	private File determineDefaultRoomCorrectionRoot() {
+		File bundledRoot = detectBundledRoot();
+		if (bundledRoot != null) {
+			File writableRoot = new File(Options.getAppDataDirectory(), "RoomCorrectionRoot");
+			ensureWritableRootInitialized(bundledRoot, writableRoot);
+			return writableRoot;
+		}
+
+		return new File(System.getProperty("user.dir"));
+	}
+
+	private File detectBundledRoot() {
+		String jpackageAppPath = System.getProperty("jpackage.app-path");
+		if (jpackageAppPath == null || jpackageAppPath.length() == 0) {
+			return null;
+		}
+
+		File launcherPath = new File(jpackageAppPath);
+		File installRoot = launcherPath.getParentFile();
+		if (installRoot == null) {
+			return null;
+		}
+
+		File appDir = new File(installRoot, "app");
+		if (appDir.exists() && appDir.isDirectory()) {
+			return appDir;
+		}
+
+		if (installRoot.exists() && installRoot.isDirectory()) {
+			return installRoot;
+		}
+
+		return null;
+	}
+
+	private File resolveSelectedRoot(File selectedRoot) {
+		File bundledRoot = detectBundledRoot();
+		if (bundledRoot == null || selectedRoot == null) {
+			return selectedRoot;
+		}
+
+		File installRoot = bundledRoot.getParentFile();
+		if (isSameOrDescendant(selectedRoot, bundledRoot)
+				|| (installRoot != null && isSameOrDescendant(selectedRoot, installRoot))) {
+			File writableRoot = new File(Options.getAppDataDirectory(), "RoomCorrectionRoot");
+			ensureWritableRootInitialized(bundledRoot, writableRoot);
+			return writableRoot;
+		}
+
+		return selectedRoot;
+	}
+
+	private boolean isSameOrDescendant(File candidate, File ancestor) {
+		if (candidate == null || ancestor == null) {
+			return false;
+		}
+
+		Path candidatePath = candidate.toPath().toAbsolutePath().normalize();
+		Path ancestorPath = ancestor.toPath().toAbsolutePath().normalize();
+		return candidatePath.startsWith(ancestorPath);
+	}
+
+	private void ensureWritableRootInitialized(File bundledRoot, File writableRoot) {
+		if (!writableRoot.exists()) {
+			writableRoot.mkdirs();
+		}
+
+		String[] entriesToRefresh = new String[] {
+			"Rec_imp.win32",
+			"drc-3.2.3",
+			"sox-14.3.2",
+			"rt",
+			"convolver4-4vc++.zip"
+		};
+
+		for (String entryName : entriesToRefresh) {
+			File source = new File(bundledRoot, entryName);
+			if (!source.exists()) {
+				continue;
+			}
+
+			File target = new File(writableRoot, entryName);
+			try {
+				copyMissingOrUpdated(source.toPath(), target.toPath(), true);
+			}
+			catch (IOException ioe) {
+				LOGGER.warning("Unable to refresh writable root entry '" + entryName + "': " + ioe.getMessage());
+			}
+		}
+
+		File convolverSource = new File(bundledRoot, "ConvolverFilters");
+		if (convolverSource.exists()) {
+			File convolverTarget = new File(writableRoot, "ConvolverFilters");
+			try {
+				copyMissingOrUpdated(convolverSource.toPath(), convolverTarget.toPath(), false);
+			}
+			catch (IOException ioe) {
+				LOGGER.warning("Unable to initialize writable ConvolverFilters entry: " + ioe.getMessage());
+			}
+		}
+	}
+
+	private void copyMissingOrUpdated(Path source, Path target, boolean overwriteExistingFiles) throws IOException {
+		if (Files.isDirectory(source)) {
+			if (!Files.exists(target)) {
+				Files.createDirectories(target);
+			}
+
+			Files.walk(source).forEach(path -> {
+				try {
+					Path relative = source.relativize(path);
+					Path dest = target.resolve(relative);
+					if (Files.isDirectory(path)) {
+						if (!Files.exists(dest)) {
+							Files.createDirectories(dest);
+						}
+					}
+					else if (!Files.exists(dest)) {
+						Files.copy(path, dest, StandardCopyOption.COPY_ATTRIBUTES);
+					}
+					else if (overwriteExistingFiles && shouldReplace(path, dest)) {
+						Files.copy(path, dest, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+					}
+				}
+				catch (IOException ioe) {
+					throw new RuntimeException(ioe);
+				}
+			});
+		}
+		else {
+			if (target.getParent() != null && !Files.exists(target.getParent())) {
+				Files.createDirectories(target.getParent());
+			}
+
+			if (!Files.exists(target)) {
+				Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
+			}
+			else if (overwriteExistingFiles && shouldReplace(source, target)) {
+				Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+			}
+		}
+	}
+
+	private boolean shouldReplace(Path source, Path target) throws IOException {
+		long sourceSize = Files.size(source);
+		long targetSize = Files.size(target);
+		if (sourceSize != targetSize) {
+			return true;
+		}
+
+		return Files.getLastModifiedTime(source).toMillis() > Files.getLastModifiedTime(target).toMillis();
+	}
+
 	private void initialize() {
-		this.setSize(800, 600);
+		this.setSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
 		this.setJMenuBar(getMnuDrcWrapper());
 		this.setContentPane(getJContentPane());
 		this.setTitle("Digital Room Correction Designer");

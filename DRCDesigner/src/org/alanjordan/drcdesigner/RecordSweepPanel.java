@@ -33,8 +33,10 @@ import java.awt.Insets;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.logging.Logger;
 
 public class RecordSweepPanel extends JPanel {
+	private static final Logger LOGGER = AppLogger.getLogger();
 
 	private static final long serialVersionUID = 1L;
 	private JPanel pnlTopSpace;
@@ -46,18 +48,22 @@ public class RecordSweepPanel extends JPanel {
 	private JLabel lblLeftOutputChannel = null;
 	private JLabel lblRightOutputChannel = null;
 	private JLabel lblSamplingRate = null;
-	private JList lstInterfaces = null;
-	private JComboBox cboLeftOutputChannel = null;
-	private JComboBox cboRightOutputChannel = null;
-	private JComboBox cboInputChannel = null;
-	private JComboBox cboSamplingRate = null;
+	private JList<String> lstInterfaces = null;
+	private JComboBox<Integer> cboLeftOutputChannel = null;
+	private JComboBox<Integer> cboRightOutputChannel = null;
+	private JComboBox<Integer> cboInputChannel = null;
+	private JComboBox<String> cboSamplingRate = null;
 	private Options options;
 	private ArrayList<SoundInterface> playbackInterfaces;
 	private ArrayList<SoundInterface> recordingInterfaces;
-	private JList lstRecordingInterfaces = null;
+	private JList<String> lstRecordingInterfaces = null;
 	private JLabel lblRecordingInterfaces = null;
 	private JLabel lblLeftChannelPeak = null;
 	private JLabel lblRightChannelPeak = null;
+
+	private File getWorkFile(String fileName) {
+		return new File(Options.getAppDataDirectory(), fileName);
+	}
 	/**
 	 * This is the default constructor
 	 */
@@ -88,7 +94,7 @@ public class RecordSweepPanel extends JPanel {
         boolean leftChannelDone = false;
         
         try {
-            scanner = new Scanner(new File("recordSweepOutput.txt"));
+			scanner = new Scanner(getWorkFile("recordSweepOutput.txt"));
 
             while (scanner.hasNextLine()) {
                 line = scanner.nextLine();
@@ -143,47 +149,74 @@ public class RecordSweepPanel extends JPanel {
             scanner.close();
         }
         catch (FileNotFoundException fnf) {
+			LOGGER.warning("Record sweep output file not found during parse.");
             System.out.println("Record sweep results file not found");
         }
 	}
 
 	private void launchRecordSweepScript() {
 		String recImpDir = options.getRoomCorrectionRootPath() + "\\Rec_imp.win32";
-		String drcDir = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample";
-		String scriptName = "";
+		String executableName = "";
 		
 		lblLeftChannelPeak.setText("Left channel peak:");
 		lblRightChannelPeak.setText("Right channel peak:");
 
 		if (options.getDriverType() == Options.InterfaceDriverType.ASIO)
-			scriptName = "rec_impAsio.exe";
+			executableName = "rec_impAsio.exe";
 		else
-			scriptName = "rec_impDS.exe";
+			executableName = "rec_impDS.exe";
+
+		String leftOutputFile = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\LeftSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm";
+		String rightOutputFile = options.getRoomCorrectionRootPath() + "\\drc-3.2.3\\sample\\RightSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm";
+		File outputLog = getWorkFile("recordSweepOutput.txt");
 		
         try {
-        	PrintWriter out = new PrintWriter(new FileWriter("drcWrapperRecordSweep.bat", false));
-        	out.println("cd " + recImpDir);
-        	out.println(scriptName + " LeftSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm " + cboSamplingRate.getSelectedItem() + " 20 21000 45 " + cboLeftOutputChannel.getSelectedIndex() + ":" + playbackInterfaces.get(lstInterfaces.getSelectedIndex()).getDeviceNumber() + " " + cboInputChannel.getSelectedIndex() + ":" + (recordingInterfaces.get(lstRecordingInterfaces.getSelectedIndex()).getDeviceNumber()));
-        	out.println("move /y LeftSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm \"" + drcDir + "\"");
-        	out.println(scriptName + " RightSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm " + cboSamplingRate.getSelectedItem() + " 20 21000 45 " + cboRightOutputChannel.getSelectedIndex() + ":" + playbackInterfaces.get(lstInterfaces.getSelectedIndex()).getDeviceNumber() + " " + cboInputChannel.getSelectedIndex() + ":" + (recordingInterfaces.get(lstRecordingInterfaces.getSelectedIndex()).getDeviceNumber()));
-        	out.println("move /y RightSpeakerImpulseResponse" + cboSamplingRate.getSelectedItem() + ".pcm \"" + drcDir + "\"");
-        	out.close();
-        	
-    		String command = "cmd.exe /c \"drcWrapperRecordSweep.bat 1>recordSweepOutput.txt 2>&1\"";
-    		Runtime rt = Runtime.getRuntime();
-    		Process p = rt.exec(command);
-    		p.waitFor();
+			runRecordSweepCommand(recImpDir, executableName, leftOutputFile, cboLeftOutputChannel.getSelectedIndex(), outputLog, false, "Record sweep left");
+			runRecordSweepCommand(recImpDir, executableName, rightOutputFile, cboRightOutputChannel.getSelectedIndex(), outputLog, true, "Record sweep right");
         	parseSweepResultsFile();
+			analyzeAndStoreResponseCurves();
+			repaint();
     	}
     		catch(Exception exc){
+			LOGGER.warning("Record sweep failed: " + exc.getMessage());
     		exc.printStackTrace();
     	}		
+	}
+
+	private void runRecordSweepCommand(String recImpDir, String executableName, String outputFile, int outputChannelIndex, File outputLog, boolean appendLog, String operationName) throws IOException, InterruptedException {
+		int playbackDeviceNumber = playbackInterfaces.get(lstInterfaces.getSelectedIndex()).getDeviceNumber();
+		int recordingDeviceNumber = recordingInterfaces.get(lstRecordingInterfaces.getSelectedIndex()).getDeviceNumber();
+		String sampleRate = cboSamplingRate.getSelectedItem().toString();
+
+		ProcessBuilder pb = new ProcessBuilder(
+				executableName,
+				outputFile,
+				sampleRate,
+				"20",
+				"21000",
+				"45",
+				outputChannelIndex + ":" + playbackDeviceNumber,
+				cboInputChannel.getSelectedIndex() + ":" + recordingDeviceNumber);
+		pb.directory(new File(recImpDir));
+		int exitCode = ProcessExecutionUtil.runCommandAndCaptureOutput(pb, outputLog, operationName, appendLog);
+		if (exitCode != 0) {
+			throw new IOException(operationName + " failed with exit code " + exitCode);
+		}
+	}
+
+	private void analyzeAndStoreResponseCurves() {
+		String selectedRate = (String) cboSamplingRate.getSelectedItem();
+		if (selectedRate == null || options.getRoomCorrectionRootPath() == null) {
+			return;
+		}
+
+		ResponseCurveAnalysisUtil.analyzeAndStoreResponseCurves(options, selectedRate);
 	}
 	
 	
 	private void updatePlaybackFields(SoundInterface si) {
-		DefaultComboBoxModel leftModel = (DefaultComboBoxModel)cboLeftOutputChannel.getModel();
-		DefaultComboBoxModel rightModel = (DefaultComboBoxModel)cboRightOutputChannel.getModel();
+		DefaultComboBoxModel<Integer> leftModel = (DefaultComboBoxModel<Integer>)cboLeftOutputChannel.getModel();
+		DefaultComboBoxModel<Integer> rightModel = (DefaultComboBoxModel<Integer>)cboRightOutputChannel.getModel();
 		leftModel.removeAllElements();
 		rightModel.removeAllElements();
 		for (int counter = 0; counter < si.getOutputChannels(); counter++) {
@@ -197,7 +230,7 @@ public class RecordSweepPanel extends JPanel {
 		if (cboRightOutputChannel.getItemCount() > 1)
 			cboRightOutputChannel.setSelectedIndex(1);
 
-		DefaultComboBoxModel rateModel = (DefaultComboBoxModel)cboSamplingRate.getModel();
+		DefaultComboBoxModel<String> rateModel = (DefaultComboBoxModel<String>)cboSamplingRate.getModel();
 		rateModel.removeAllElements();
 		if (si.isProbeStatusSuccessful()) {
 			String[] rates = si.getSupportedSampleRates();
@@ -209,13 +242,13 @@ public class RecordSweepPanel extends JPanel {
 	}
 
 	private void updateRecordingFields(SoundInterface si) {		
-		DefaultComboBoxModel inputModel = (DefaultComboBoxModel)cboInputChannel.getModel();
+		DefaultComboBoxModel<Integer> inputModel = (DefaultComboBoxModel<Integer>)cboInputChannel.getModel();
 		inputModel.removeAllElements();
 		for (int counter = 0; counter < si.getInputChannels(); counter++) {
 			inputModel.addElement(counter + 1);
 		}
 		
-		DefaultComboBoxModel rateModel = (DefaultComboBoxModel)cboSamplingRate.getModel();
+		DefaultComboBoxModel<String> rateModel = (DefaultComboBoxModel<String>)cboSamplingRate.getModel();
 		rateModel.removeAllElements();
 		if (si.isProbeStatusSuccessful()) {
 			String[] rates = si.getSupportedSampleRates();
@@ -231,7 +264,7 @@ public class RecordSweepPanel extends JPanel {
 		SoundInterface inputInterface = null;
 		String [] outputRates;
 		
-		DefaultComboBoxModel rateModel = (DefaultComboBoxModel)cboSamplingRate.getModel();
+		DefaultComboBoxModel<String> rateModel = (DefaultComboBoxModel<String>)cboSamplingRate.getModel();
 		
 		if (lstInterfaces.getSelectedIndex() > -1) 
 			outputInterface = playbackInterfaces.get(lstInterfaces.getSelectedIndex());
@@ -487,7 +520,7 @@ public class RecordSweepPanel extends JPanel {
 					SoundInterfaceParser sip = new SoundInterfaceParser(options);
 					playbackInterfaces = sip.getPlaybackInterfaces();
 					recordingInterfaces = sip.getRecordingInterfaces();
-					DefaultListModel dfl = (DefaultListModel)lstInterfaces.getModel();
+					DefaultListModel<String> dfl = (DefaultListModel<String>)lstInterfaces.getModel();
 					dfl.clear();
 		//			for (SoundInterface t: interfaces) {
 		//				dfl.addElement(t.getName());
@@ -496,7 +529,7 @@ public class RecordSweepPanel extends JPanel {
 						dfl.addElement(t.getName());
 					}
 
-					DefaultListModel dflr = (DefaultListModel)lstRecordingInterfaces.getModel();
+					DefaultListModel<String> dflr = (DefaultListModel<String>)lstRecordingInterfaces.getModel();
 					dflr.clear();
 					for (SoundInterface t: recordingInterfaces) {
 						dflr.addElement(t.getName());
@@ -525,16 +558,16 @@ public class RecordSweepPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JList	
 	 */
-	private JList getLstInterfaces() {
+	private JList<String> getLstInterfaces() {
 		if (lstInterfaces == null) {
-			lstInterfaces = new JList(new DefaultListModel());
+			lstInterfaces = new JList<String>(new DefaultListModel<String>());
 			lstInterfaces
 					.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
 						public void valueChanged(javax.swing.event.ListSelectionEvent e) {
 							if (e.getValueIsAdjusting())
 								return;
 							
-							JList interfaceList = (JList)e.getSource();
+							JList<?> interfaceList = (JList<?>)e.getSource();
 						    int index = interfaceList.getSelectedIndex();
 						    if (index > -1)
 						    	updatePlaybackFields(playbackInterfaces.get(index));
@@ -550,9 +583,9 @@ public class RecordSweepPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JComboBox	
 	 */
-	private JComboBox getCboLeftOutputChannel() {
+	private JComboBox<Integer> getCboLeftOutputChannel() {
 		if (cboLeftOutputChannel == null) {
-			cboLeftOutputChannel = new JComboBox();
+			cboLeftOutputChannel = new JComboBox<Integer>();
 			cboLeftOutputChannel.addItemListener(new java.awt.event.ItemListener() {
 				public void itemStateChanged(java.awt.event.ItemEvent e) {
 					enableDisableRecordButton();
@@ -567,9 +600,9 @@ public class RecordSweepPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JComboBox	
 	 */
-	private JComboBox getCboRightOutputChannel() {
+	private JComboBox<Integer> getCboRightOutputChannel() {
 		if (cboRightOutputChannel == null) {
-			cboRightOutputChannel = new JComboBox();
+			cboRightOutputChannel = new JComboBox<Integer>();
 			cboRightOutputChannel.addItemListener(new java.awt.event.ItemListener() {
 				public void itemStateChanged(java.awt.event.ItemEvent e) {
 					enableDisableRecordButton();
@@ -584,9 +617,9 @@ public class RecordSweepPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JComboBox	
 	 */
-	private JComboBox getCboInputChannel() {
+	private JComboBox<Integer> getCboInputChannel() {
 		if (cboInputChannel == null) {
-			cboInputChannel = new JComboBox();
+			cboInputChannel = new JComboBox<Integer>();
 		}
 		return cboInputChannel;
 	}
@@ -596,9 +629,9 @@ public class RecordSweepPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JComboBox	
 	 */
-	private JComboBox getCboSamplingRate() {
+	private JComboBox<String> getCboSamplingRate() {
 		if (cboSamplingRate== null) {
-			cboSamplingRate = new JComboBox();
+			cboSamplingRate = new JComboBox<String>();
 			cboSamplingRate.addItemListener(new java.awt.event.ItemListener() {
 				public void itemStateChanged(java.awt.event.ItemEvent e) {
 					enableDisableRecordButton();
@@ -613,16 +646,16 @@ public class RecordSweepPanel extends JPanel {
 	 * 	
 	 * @return javax.swing.JList	
 	 */
-	private JList getLstRecordingInterfaces() {
+	private JList<String> getLstRecordingInterfaces() {
 		if (lstRecordingInterfaces == null) {
-			lstRecordingInterfaces = new JList(new DefaultListModel());
+			lstRecordingInterfaces = new JList<String>(new DefaultListModel<String>());
 			lstRecordingInterfaces
 					.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
 						public void valueChanged(javax.swing.event.ListSelectionEvent e) {
 							if (e.getValueIsAdjusting())
 								return;
 							
-							JList recordingInterfaceList = (JList)e.getSource();
+							JList<?> recordingInterfaceList = (JList<?>)e.getSource();
 						    int index = recordingInterfaceList.getSelectedIndex();
 						    if (index > -1)
 						    	updateRecordingFields(recordingInterfaces.get(index));
